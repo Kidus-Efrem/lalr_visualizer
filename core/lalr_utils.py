@@ -106,3 +106,120 @@ def build_LALR_states(grammar):
             changed = True
 
     return states, transitions
+def build_parsing_tables(states, transitions, grammar):
+    """
+    Build ACTION and GOTO tables for LALR parser
+    Returns:
+        ACTION: dict of (state, terminal) -> action
+        GOTO: dict of (state, nonterminal) -> next_state
+    """
+    ACTION = {}
+    GOTO = {}
+
+    for state_id, state in enumerate(states):
+        for item in state:
+            # Completed item → reduce or accept
+            if item.is_complete():
+                if item.production.left.name == grammar.start_symbol.name:
+                    # Accept
+                    ACTION[(state_id, Terminal('$'))] = 'ACC'
+                else:
+                    # Reduce by this production
+                    for la in [item.lookahead]:
+                        ACTION[(state_id, la)] = f"R({item.production})"
+
+            # Not complete → shift
+            else:
+                sym = item.next_symbol()
+                if isinstance(sym, Terminal):
+                    next_state = transitions.get((state_id, sym))
+                    if next_state is not None:
+                        ACTION[(state_id, sym)] = f"S({next_state})"
+                elif isinstance(sym, NonTerminal):
+                    next_state = transitions.get((state_id, sym))
+                    if next_state is not None:
+                        GOTO[(state_id, sym)] = next_state
+
+    return ACTION, GOTO
+def parse_input(input_tokens, ACTION, GOTO, grammar):
+    """
+    Parse a list of input tokens using the ACTION and GOTO tables
+    input_tokens: list of Terminals (include $ at the end)
+    """
+    stack = [0]  # start with state 0
+    pointer = 0  # position in input
+    input_tokens.append(Terminal('$'))  # ensure end marker
+
+    print("Parsing steps:\n")
+    while True:
+        state = stack[-1]
+        current_token = input_tokens[pointer]
+        action = ACTION.get((state, current_token))
+
+        if action is None:
+            print(f"Error: no action for state {state} with input {current_token}")
+            return False
+
+        if action.startswith('S'):
+            # Shift
+            next_state = int(action[2:-1])
+            stack.append(next_state)
+            pointer += 1
+            print(f"Shift {current_token}, push state {next_state}")
+        elif action.startswith('R'):
+            # Reduce
+            # Extract production from string
+            prod_str = action[2:-1]
+            left_side, right_side = prod_str.split('→')
+            left_side = left_side.strip()
+            right_symbols = right_side.strip().split()
+
+            # Pop states equal to RHS length
+            for _ in right_symbols:
+                if _ != 'ε':  # ignore epsilon
+                    stack.pop()
+
+            # Push next state from GOTO table
+            top_state = stack[-1]
+            nt = NonTerminal(left_side)
+            goto_state = GOTO.get((top_state, nt))
+            if goto_state is None:
+                print(f"Error: no GOTO for state {top_state} with {nt}")
+                return False
+
+            stack.append(goto_state)
+            print(f"Reduce by {prod_str}, push state {goto_state}")
+        elif action == 'ACC':
+            print("Input string accepted!")
+            return True
+def tokenize(input_string):
+    """
+    Convert a raw input string into a list of Terminals.
+    Recognizes: id, +, *, (, )
+    Ignores spaces.
+    """
+    tokens = []
+    i = 0
+    while i < len(input_string):
+        c = input_string[i]
+
+        if c.isspace():
+            i += 1
+            continue
+        elif c.isalpha():  # assuming all variable names are 'id'
+            # consume full identifier (e.g., id)
+            j = i
+            while j < len(input_string) and input_string[j].isalnum():
+                j += 1
+            token_str = input_string[i:j]
+            if token_str == "id":
+                tokens.append(Terminal("id"))
+            else:
+                raise ValueError(f"Unknown identifier: {token_str}")
+            i = j
+        elif c in '+*()':
+            tokens.append(Terminal(c))
+            i += 1
+        else:
+            raise ValueError(f"Unknown character: {c}")
+    return tokens
