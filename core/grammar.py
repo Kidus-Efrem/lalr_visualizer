@@ -56,46 +56,40 @@ class Grammar:
                     self.non_terminals.add(sym)
                 elif isinstance(sym, Terminal):
                     self.terminals.add(sym)
-    def augment(self):
-            new_start = NonTerminal(f"{self.start_symbol.name}'")
-            new_production = Production(new_start, [self.start_symbol])
-            self.productions.insert(0, new_production)
 
-            self.start_symbol = new_start
-            self.non_terminals.add(new_start)
+    def augment(self):
+        new_start = NonTerminal(f"{self.start_symbol.name}'")
+        new_production = Production(new_start, [self.start_symbol])
+        self.productions.insert(0, new_production)
+        self.start_symbol = new_start
+        self.non_terminals.add(new_start)
+
     def compute_first(self):
-        # Initialize FIRST sets
         self.first = {symbol: set() for symbol in self.non_terminals.union(self.terminals)}
 
-        # FIRST of terminals is the terminal itself
+        # FIRST of terminals is itself
         for t in self.terminals:
             self.first[t].add(t)
 
-        # Repeat until no changes
         changed = True
         while changed:
             changed = False
             for prod in self.productions:
                 left = prod.left
                 right = prod.right
-
-                # Track if ε can be derived
                 can_derive_epsilon = True
 
                 for sym in right:
-                    # Add FIRST(sym) \ {ε} to FIRST(left)
                     before = len(self.first[left])
                     self.first[left].update(self.first[sym] - set(['ε']))
                     after = len(self.first[left])
                     if after > before:
                         changed = True
 
-                    # Stop if sym does NOT derive ε
                     if 'ε' not in self.first[sym]:
                         can_derive_epsilon = False
                         break
 
-                # If all symbols can derive ε, add ε to FIRST(left)
                 if can_derive_epsilon:
                     if 'ε' not in self.first[left]:
                         self.first[left].add('ε')
@@ -107,9 +101,8 @@ class Grammar:
             first_set = ", ".join(str(t) for t in self.first[sym])
             print(f"FIRST({sym}) = {{ {first_set} }}")
 
-
     def print(self):
-        print(f"Start symbol: {self.start_symbol}\n")
+        print(f"\nStart symbol: {self.start_symbol}\n")
         print("Productions:")
         for prod in self.productions:
             print(f"  {prod}")
