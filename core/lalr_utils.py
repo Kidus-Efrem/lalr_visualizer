@@ -4,6 +4,9 @@ from core.Item import Item
 from core.grammar import NonTerminal, Terminal
 from collections import defaultdict
 from core.clr_utils import closure, goto
+import logging
+
+logger = logging.getLogger(__name__)
 
 # --------------------------------------------------
 # LALR STATE BUILDING
@@ -55,6 +58,6 @@ def build_LALR_states(grammar):
         new_to = state_mapping[old_to]
         lalr_transitions[(new_from, sym)] = new_to
 
-    print(f"\n[INFO] Built LALR(1) states: {len(lalr_states)} (merged from {len(lr1_states)} LR(1) states)")
+    logger.info(f"[LOG lalr_states_built] ========= Built LALR(1) states: {len(lalr_states)} (merged from {len(lr1_states)} LR(1) states)")
 
     return lalr_states, lalr_transitions

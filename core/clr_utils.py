@@ -2,7 +2,9 @@
 
 from core.Item import Item
 from core.grammar import NonTerminal, Terminal
-from collections import defaultdict
+import logging
+
+logger = logging.getLogger(__name__)
 
 # --------------------------------------------------
 # CLOSURE (LR(1))
@@ -98,7 +100,7 @@ def build_LR1_states(grammar):
 
 def build_CLR_states(grammar):
     clr_states, clr_transitions = build_LR1_states(grammar)
-    print("\n[INFO] Built canonical LR(1) states:", len(clr_states))
+    logger.info(f"[LOG clr_states_built] ========= Built canonical LR(1) states: {len(clr_states)}")
 
     return clr_states, clr_transitions
 
@@ -145,7 +147,9 @@ def parse_input(tokens, ACTION, GOTO, grammar):
 
         action = ACTION.get((state, token))
         if action is None:
-            print(f"❌ Error at state {state}, token {token}")
+            error_msg = f"Error at state {state}, token {token}"
+            logger.error(f"[LOG parse_error] ========= {error_msg}")
+            print(f"❌ {error_msg}")
             return False
 
         # Print current state with symbols
@@ -158,6 +162,7 @@ def parse_input(tokens, ACTION, GOTO, grammar):
             state_stack.append(ns)
             symbol_stack.append(str(token))
             i += 1
+            logger.debug(f"[LOG parse_shift] ========= Shift {token}, push state {ns}")
             print(f"Shift {token}, push {ns}")
 
         elif action.startswith("R"):
@@ -176,9 +181,11 @@ def parse_input(tokens, ACTION, GOTO, grammar):
             top = state_stack[-1]
             goto = GOTO.get((top, NonTerminal(lhs.strip())))
             state_stack.append(goto)
+            logger.debug(f"[LOG parse_reduce] ========= Reduce {prod}, goto state {goto}")
             print(f"Reduce {prod}, goto {goto}")
 
         elif action == "ACC":
+            logger.info("[LOG parse_accept] ========= Input accepted successfully")
             print("✅ Input accepted")
             return True
 
@@ -214,6 +221,7 @@ def tokenize(input_string, terminals):
                 break
 
         if not matched:
+            logger.warning(f"[LOG tokenize_warning] ========= Unknown character '{input_string[i]}', treating as terminal")
             tokens.append(Terminal(input_string[i]))
             i += 1
 

@@ -1,5 +1,9 @@
 # core/grammar.py
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class Symbol:
     def __init__(self, name: str):
         self.name = name
@@ -63,6 +67,7 @@ class Grammar:
         self.productions.insert(0, new_production)
         self.start_symbol = new_start
         self.non_terminals.add(new_start)
+        logger.debug(f"[LOG grammar_augment] ========= Grammar augmented with new start symbol: {new_start}")
 
     def compute_first(self):
         self.first = {symbol: set() for symbol in self.non_terminals.union(self.terminals)}
@@ -94,6 +99,8 @@ class Grammar:
                     if 'ε' not in self.first[left]:
                         self.first[left].add('ε')
                         changed = True
+        
+        logger.info(f"[LOG first_sets_computed] ========= FIRST sets computed for {len(self.non_terminals)} non-terminals")
 
     def print_first(self):
         print("\nFIRST sets:")
