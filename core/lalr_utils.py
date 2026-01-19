@@ -2,6 +2,11 @@
 
 from core.Item import Item
 from core.grammar import NonTerminal, Terminal
+from collections import defaultdict
+
+# --------------------------------------------------
+# CLOSURE (LR(1))
+# --------------------------------------------------
 
 def closure(items: set, grammar):
     closure_set = set(items)
@@ -17,15 +22,16 @@ def closure(items: set, grammar):
                 for prod in grammar.productions:
                     if prod.left == next_sym:
                         beta = item.production.right[item.dot + 1:]
-                        beta_lookahead = beta + ([item.lookahead] if item.lookahead else [])
+                        beta_lookahead = beta + [item.lookahead]
                         first_set = compute_first_sequence(grammar, beta_lookahead)
+
                         for la in first_set:
-                            new_item = Item(prod, dot=0, lookahead=la)
+                            new_item = Item(prod, 0, la)
                             if new_item not in closure_set:
                                 new_items.add(new_item)
 
         if new_items:
-            closure_set.update(new_items)
+            closure_set |= new_items
             added = True
 
     return closure_set
@@ -34,154 +40,217 @@ def closure(items: set, grammar):
 def compute_first_sequence(grammar, symbols):
     result = set()
     for sym in symbols:
-        result.update(grammar.first[sym] - set(['ε']))
+        result |= grammar.first[sym] - {'ε'}
         if 'ε' not in grammar.first[sym]:
             return result
     result.add('ε')
     return result
 
 
-def goto(items: set, symbol, grammar):
-    moved_items = set()
+# --------------------------------------------------
+# GOTO
+# --------------------------------------------------
+
+def goto(items, symbol, grammar):
+    moved = set()
     for item in items:
         if item.next_symbol() == symbol:
-            moved_items.add(item.advance_dot())
-    return closure(moved_items, grammar)
+            moved.add(item.advance_dot())
+    return closure(moved, grammar)
 
 
-def build_LALR_states(grammar):
+# --------------------------------------------------
+# BUILD CANONICAL LR(1) STATES
+# --------------------------------------------------
+
+def build_LR1_states(grammar):
     start_prod = grammar.productions[0]
-    start_item = Item(start_prod, dot=0, lookahead=Terminal('$'))
+    start_item = Item(start_prod, 0, Terminal('$'))
     start_state = closure({start_item}, grammar)
 
     states = [start_state]
     state_ids = {frozenset(start_state): 0}
     transitions = {}
 
-    changed = True
-    while changed:
-        changed = False
-        new_states = []
+    i = 0
+    while i < len(states):
+        state = states[i]
+        symbols = {item.next_symbol() for item in state if item.next_symbol()}
 
-        for i, state in enumerate(states):
-            symbols = set(item.next_symbol() for item in state if item.next_symbol() is not None)
-            for sym in symbols:
-                next_state = goto(state, sym, grammar)
-                if not next_state:
-                    continue
-                fs = frozenset(next_state)
-                if fs not in state_ids:
-                    state_ids[fs] = len(states) + len(new_states)
-                    new_states.append(next_state)
-                transitions[(i, sym)] = state_ids[fs]
+        for sym in symbols:
+            next_state = goto(state, sym, grammar)
+            fs = frozenset(next_state)
 
-        if new_states:
-            states.extend(new_states)
-            changed = True
+            if fs not in state_ids:
+                state_ids[fs] = len(states)
+                states.append(next_state)
+
+            transitions[(i, sym)] = state_ids[fs]
+
+        i += 1
 
     return states, transitions
 
+
+# --------------------------------------------------
+# TRUE LALR MERGING
+# --------------------------------------------------
+
+def merge_LALR_states(lr1_states, lr1_transitions):
+    core_map = defaultdict(list)
+
+    # Group states by LR(0) core
+    for idx, state in enumerate(lr1_states):
+        core = frozenset((item.production, item.dot) for item in state)
+        core_map[core].append(idx)
+
+    lalr_states = []
+    state_map = {}  # LR(1) state → LALR state id
+
+    for new_id, (_, state_indices) in enumerate(core_map.items()):
+        merged_items = {}
+
+        for idx in state_indices:
+            for item in lr1_states[idx]:
+                key = (item.production, item.dot)
+                if key not in merged_items:
+                    merged_items[key] = set()
+                merged_items[key].add(item.lookahead)
+
+        merged_state = set()
+        for (prod, dot), lookaheads in merged_items.items():
+            for la in lookaheads:
+                merged_state.add(Item(prod, dot, la))
+
+        lalr_states.append(merged_state)
+
+        for old_id in state_indices:
+            state_map[old_id] = new_id
+
+    # Remap transitions
+    lalr_transitions = {}
+    for (old_state, sym), old_target in lr1_transitions.items():
+        s = state_map[old_state]
+        t = state_map[old_target]
+        lalr_transitions[(s, sym)] = t
+
+    return lalr_states, lalr_transitions
+
+
+# --------------------------------------------------
+# PUBLIC ENTRY POINT
+# --------------------------------------------------
+
+def build_LALR_states(grammar):
+    lr1_states, lr1_transitions = build_LR1_states(grammar)
+    print("\n[INFO] Built canonical LR(1) states:", len(lr1_states))
+
+    lalr_states, lalr_transitions = merge_LALR_states(lr1_states, lr1_transitions)
+    print("[INFO] After LALR merging:", len(lalr_states))
+
+    return lalr_states, lalr_transitions
+
+
+# --------------------------------------------------
+# PARSING TABLES
+# --------------------------------------------------
 
 def build_parsing_tables(states, transitions, grammar):
     ACTION = {}
     GOTO = {}
 
-    for state_id, state in enumerate(states):
+    for sid, state in enumerate(states):
         for item in state:
             if item.is_complete():
-                if item.production.left.name == grammar.start_symbol.name:
-                    ACTION[(state_id, Terminal('$'))] = 'ACC'
+                if item.production.left == grammar.start_symbol:
+                    ACTION[(sid, Terminal('$'))] = 'ACC'
                 else:
-                    for la in [item.lookahead]:
-                        ACTION[(state_id, la)] = f"R({item.production})"
+                    ACTION[(sid, item.lookahead)] = f"R({item.production})"
             else:
                 sym = item.next_symbol()
-                next_state = transitions.get((state_id, sym))
-                if isinstance(sym, Terminal):
-                    if next_state is not None:
-                        ACTION[(state_id, sym)] = f"S({next_state})"
-                elif isinstance(sym, NonTerminal):
-                    if next_state is not None:
-                        GOTO[(state_id, sym)] = next_state
+                target = transitions.get((sid, sym))
+                if isinstance(sym, Terminal) and target is not None:
+                    ACTION[(sid, sym)] = f"S({target})"
+                elif isinstance(sym, NonTerminal) and target is not None:
+                    GOTO[(sid, sym)] = target
+
     return ACTION, GOTO
 
 
-def parse_input(input_tokens, ACTION, GOTO, grammar):
-    stack = [0]
-    pointer = 0
-    input_tokens.append(Terminal('$'))
+# --------------------------------------------------
+# PARSER
+# --------------------------------------------------
 
-    print("\nParsing steps:\n")
+def parse_input(tokens, ACTION, GOTO, grammar):
+    stack = [0]
+    i = 0
+
+    print("\nParsing steps:")
     while True:
         state = stack[-1]
-        current_token = input_tokens[pointer]
-        action = ACTION.get((state, current_token))
+        token = tokens[i]
 
+        action = ACTION.get((state, token))
         if action is None:
-            print(f"Error: no action for state {state} with input {current_token}")
+            print(f"❌ Error at state {state}, token {token}")
             return False
 
-        if action.startswith('S'):
-            next_state = int(action[2:-1])
-            stack.append(next_state)
-            pointer += 1
-            print(f"Shift {current_token}, push state {next_state}")
+        if action.startswith("S"):
+            ns = int(action[2:-1])
+            stack.append(ns)
+            i += 1
+            print(f"Shift {token}, push {ns}")
 
-        elif action.startswith('R'):
-            prod_str = action[2:-1]
-            left_side, right_side = prod_str.split('→')
-            left_side = left_side.strip()
-            right_symbols = right_side.strip().split()
+        elif action.startswith("R"):
+            prod = action[2:-1]
+            lhs, rhs = prod.split("→")
+            rhs_len = len(rhs.strip().split()) if rhs.strip() else 0
 
-            for _ in right_symbols:
-                if _ != 'ε':
-                    stack.pop()
+            for _ in range(rhs_len):
+                stack.pop()
 
-            top_state = stack[-1]
-            nt = NonTerminal(left_side)
-            goto_state = GOTO.get((top_state, nt))
-            if goto_state is None:
-                print(f"Error: no GOTO for state {top_state} with {nt}")
-                return False
+            top = stack[-1]
+            goto = GOTO.get((top, NonTerminal(lhs.strip())))
+            stack.append(goto)
+            print(f"Reduce {prod}, goto {goto}")
 
-            stack.append(goto_state)
-            print(f"Reduce by {prod_str}, push state {goto_state}")
-
-        elif action == 'ACC':
-            print("Input string accepted!")
+        elif action == "ACC":
+            print("✅ Input accepted")
             return True
 
+
+# --------------------------------------------------
+# TOKENIZER
+# --------------------------------------------------
 
 def tokenize(input_string, terminals):
     tokens = []
     i = 0
-    while i < len(input_string):
-        c = input_string[i]
+    terminal_strings = sorted([str(t) for t in terminals], key=len, reverse=True)
 
-        if c.isspace():
+    while i < len(input_string):
+        if input_string[i].isspace():
             i += 1
             continue
 
-        # identifier
-        elif c.isalpha():
+        if input_string[i].isalpha():
             j = i
             while j < len(input_string) and input_string[j].isalnum():
                 j += 1
-            token_str = input_string[i:j]
-            if "id" in [str(t) for t in terminals]:
-                tokens.append(Terminal("id"))
-            else:
-                tokens.append(Terminal(token_str))
+            tokens.append(Terminal("id"))
             i = j
+            continue
 
-        # check if symbol is in grammar terminals
-        elif any(input_string.startswith(str(t), i) for t in terminals):
-            match = max((str(t) for t in terminals if input_string.startswith(str(t), i)), key=len)
-            tokens.append(Terminal(match))
-            i += len(match)
+        matched = False
+        for t in terminal_strings:
+            if input_string.startswith(t, i):
+                tokens.append(Terminal(t))
+                i += len(t)
+                matched = True
+                break
 
-        else:
-            tokens.append(Terminal(c))
+        if not matched:
+            tokens.append(Terminal(input_string[i]))
             i += 1
 
     tokens.append(Terminal("$"))
