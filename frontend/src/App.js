@@ -22,9 +22,7 @@ function App() {
     'Group Members',
     'Grammar Input',
     'Grammar & First Sets',
-    'LR(1) States',
-    'LALR Minimization',
-    'LALR States',
+    'CLR(1) States',
     'Parsing Tables',
     'Parse Input'
   ];
@@ -60,14 +58,14 @@ function App() {
   };
 
   useEffect(() => {
-    if (data && (activeStep === 3 || activeStep === 5) && graphRef.current) {
+    if (data && activeStep === 3 && graphRef.current) {
       // Destroy previous network if exists
       if (networkRef.current) {
         networkRef.current.destroy();
       }
 
-      const states = activeStep === 3 ? data.lr1_states : data.lalr_states;
-      const transitions = activeStep === 3 ? data.lr1_transitions : data.lalr_transitions;
+      const states = activeStep === 3 ? data.clr_states : data.lalr_states;
+      const transitions = activeStep === 3 ? data.clr_transitions : data.lalr_transitions;
 
       const nodes = states.map(state => ({
         id: state.id,
@@ -108,7 +106,7 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <h1>LALR Parser Visualizer</h1>
+        <h1>CLR Parser Visualizer Group 7 Assignment</h1>
       </header>
       <div className="container">
         <div className="steps-nav">
@@ -128,18 +126,19 @@ function App() {
             <h2>Group Members</h2>
             <div className="section">
               <h3>Compiler Design Section C - Group Assignment</h3>
-              <p>This LALR Parser Visualizer was developed as a group project for Compiler Design Section C.</p>
+              <p>This CLR Parser Visualizer was developed as a group project for Compiler Design Section C.</p>
 
               <h4>Group Members:</h4>
               <ol style={{ fontSize: '18px', lineHeight: '2' }}>
                 <li>Kidus Efrem</li>
                 <li>Kaleb Mesfin</li>
-                <li>Lemessa Elias</li>
+                <li>Lemesa Elias</li>
+                <li>Mahlet Tessema</li>
                 <li>Kidus Yosef</li>
               </ol>
 
               <p style={{ marginTop: '20px', fontStyle: 'italic' }}>
-                This tool visualizes the LALR(1) parsing process, showing grammar construction,
+                This tool visualizes the CLR(1) parsing process, showing grammar construction,
                 state generation, table building, and input parsing with detailed step-by-step explanations.
               </p>
             </div>
@@ -208,92 +207,10 @@ function App() {
 
         {activeStep === 3 && data && (
           <div className="step-content">
-            <h2>LR(1) States</h2>
-            <p>These are the canonical LR(1) states before LALR minimization.</p>
-            {data.lr1_states.map((state) => (
-              <div key={state.id} className="state">
-                <h3>State {state.id}</h3>
-                <pre style={{ background: '#f9f9f9', padding: '10px', borderRadius: '5px', fontFamily: 'monospace' }}>
-                  {state.items.join('\n')}
-                </pre>
-              </div>
-            ))}
-            <div className="section">
-              <h3>LR(1) State Machine Graph</h3>
-              <div ref={graphRef} style={{ height: '600px', border: '1px solid #ddd', borderRadius: '5px' }}></div>
-            </div>
-            <div className="section">
-              <h3>Transitions</h3>
-              <ul>
-                {Object.entries(data.lr1_transitions).map(([key, target]) => (
-                  <li key={key}>{key} → {target}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        )}
-
-        {activeStep === 4 && data && (
-          <div className="step-content">
-            <h2>LALR Minimization</h2>
-            <p>This step shows how LR(1) states are merged into LALR(1) states by combining states with identical LR(0) cores but different lookaheads.</p>
-
-            {data.merge_info && data.merge_info.length > 0 ? (
-              <div className="section">
-                <h3>State Merging Details</h3>
-                <div style={{ display: 'grid', gap: '15px' }}>
-                  {data.merge_info.map((merge, idx) => (
-                    <div key={idx} style={{
-                      background: '#f8f9fa',
-                      padding: '15px',
-                      borderRadius: '8px',
-                      border: '1px solid #e9ecef'
-                    }}>
-                      <h4 style={{ margin: '0 0 10px 0', color: '#495057' }}>
-                        LALR State {merge.lalr_state}
-                      </h4>
-                      <div style={{ marginBottom: '10px' }}>
-                        <strong>Merged LR(1) States:</strong> {merge.merged_lr1_states.join(', ')}
-                      </div>
-                      <div>
-                        <strong>Core Items:</strong>
-                        <ul style={{ margin: '5px 0', paddingLeft: '20px' }}>
-                          {merge.core_items.map(([prod, dot], i) => (
-                            <li key={i}>{prod} [dot at position {dot}]</li>
-                          ))}
-                        </ul>
-                      </div>
-                      <div style={{ fontSize: '14px', color: '#6c757d', marginTop: '10px' }}>
-                        These LR(1) states had identical LR(0) cores but different lookaheads.
-                        LALR merging combines them by taking the union of their lookaheads.
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="section">
-                <p>No state merging was necessary - the LR(1) grammar is already LALR(1).</p>
-              </div>
-            )}
-
-            <div className="section">
-              <h3>Summary</h3>
-              <p>
-                <strong>LR(1) States:</strong> {data.lr1_states.length}<br />
-                <strong>LALR(1) States:</strong> {data.lalr_states.length}<br />
-                <strong>States Merged:</strong> {data.lr1_states.length - data.lalr_states.length}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {activeStep === 5 && data && (
-          <div className="step-content">
-            <h2>LALR States</h2>
-            <p>These are the final LALR(1) states after merging compatible LR(1) states.</p>
+            <h2>CLR(1) States</h2>
+            <p>These are the canonical LR(1) states for the CLR(1) parser.</p>
             <div className="states-grid">
-              {data.lalr_states.map((state) => (
+              {data.clr_states.map((state) => (
                 <div key={state.id} className="state-card">
                   <div className="state-header">
                     <h3>State {state.id}</h3>
@@ -309,13 +226,13 @@ function App() {
               ))}
             </div>
             <div className="section">
-              <h3>LALR State Machine Graph</h3>
+              <h3>CLR(1) State Machine Graph</h3>
               <div ref={graphRef} style={{ height: '600px', border: '1px solid #ddd', borderRadius: '5px' }}></div>
             </div>
             <div className="section">
               <h3>Transitions</h3>
               <ul>
-                {Object.entries(data.lalr_transitions).map(([key, target]) => (
+                {Object.entries(data.clr_transitions).map(([key, target]) => (
                   <li key={key}>{key} → {target}</li>
                 ))}
               </ul>
@@ -323,30 +240,14 @@ function App() {
           </div>
         )}
 
-        {activeStep === 6 && data && (
+        {activeStep === 4 && data && (
           <div className="step-content">
-            <h2>Parsing Tables</h2>
-
-            {data.merge_info && data.merge_info.length > 0 && (
-              <div className="section">
-                <h3>LALR Minimization Steps</h3>
-                <p>The following LR(1) states were merged into LALR(1) states:</p>
-                <ul>
-                  {data.merge_info.map((merge, idx) => (
-                    <li key={idx}>
-                      <strong>LALR State {merge.lalr_state}</strong> ← Merged LR(1) States {merge.merged_lr1_states.join(', ')}
-                      <br />
-                      <small>Core items: {merge.core_items.map(([prod, dot]) => `${prod} [${dot}]`).join(', ')}</small>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            <h2>CLR(1) Parsing Tables</h2>
 
             <div className="section">
-              <h3>LR(1) ACTION Table</h3>
+              <h3>CLR(1) ACTION Table</h3>
               {(() => {
-                const states = Array.from({length: data.lr1_states.length}, (_, i) => i);
+                const states = Array.from({length: data.clr_states.length}, (_, i) => i);
                 const terminals = [...data.grammar.terminals, '$'];
                 return (
                   <table>
@@ -362,7 +263,7 @@ function App() {
                           <td>{state}</td>
                           {terminals.map(term => {
                             const key = `${state},${term}`;
-                            const action = data.lr1_tables.ACTION[key] || '';
+                            const action = data.clr_tables.ACTION[key] || '';
                             return <td key={term}>{action}</td>;
                           })}
                         </tr>
@@ -374,9 +275,9 @@ function App() {
             </div>
 
             <div className="section">
-              <h3>LR(1) GOTO Table</h3>
+              <h3>CLR(1) GOTO Table</h3>
               {(() => {
-                const states = Array.from({length: data.lr1_states.length}, (_, i) => i);
+                const states = Array.from({length: data.clr_states.length}, (_, i) => i);
                 const nonTerminals = data.grammar.non_terminals;
                 return (
                   <table>
@@ -392,67 +293,7 @@ function App() {
                           <td>{state}</td>
                           {nonTerminals.map(nt => {
                             const key = `${state},${nt}`;
-                            const nextState = data.lr1_tables.GOTO[key] || '';
-                            return <td key={nt}>{nextState}</td>;
-                          })}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                );
-              })()}
-            </div>
-
-            <div className="section">
-              <h3>LALR(1) ACTION Table</h3>
-              {(() => {
-                const states = Array.from({length: data.lalr_states.length}, (_, i) => i);
-                const terminals = [...data.grammar.terminals, '$'];
-                return (
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>State</th>
-                        {terminals.map(term => <th key={term}>{term}</th>)}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {states.map(state => (
-                        <tr key={state}>
-                          <td>{state}</td>
-                          {terminals.map(term => {
-                            const key = `${state},${term}`;
-                            const action = data.lalr_tables.ACTION[key] || '';
-                            return <td key={term}>{action}</td>;
-                          })}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                );
-              })()}
-            </div>
-
-            <div className="section">
-              <h3>LALR(1) GOTO Table</h3>
-              {(() => {
-                const states = Array.from({length: data.lalr_states.length}, (_, i) => i);
-                const nonTerminals = data.grammar.non_terminals;
-                return (
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>State</th>
-                        {nonTerminals.map(nt => <th key={nt}>{nt}</th>)}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {states.map(state => (
-                        <tr key={state}>
-                          <td>{state}</td>
-                          {nonTerminals.map(nt => {
-                            const key = `${state},${nt}`;
-                            const nextState = data.lalr_tables.GOTO[key] || '';
+                            const nextState = data.clr_tables.GOTO[key] || '';
                             return <td key={nt}>{nextState}</td>;
                           })}
                         </tr>
@@ -465,7 +306,7 @@ function App() {
           </div>
         )}
 
-        {activeStep === 7 && data && (
+        {activeStep === 5 && data && (
           <div className="step-content">
             <h2>Parse Input</h2>
             <div className="input-group">
@@ -482,7 +323,7 @@ function App() {
             {parseResult && (
               <div className="section">
                 <h3>Parsing Steps</h3>
-                <p>The parser uses a stack-based approach with the LALR(1) parsing tables. Each step shows the current stack state, remaining input, and the action taken.</p>
+                <p>The parser uses a stack-based approach with the CLR(1) parsing tables. Each step shows the current stack state, remaining input, and the action taken.</p>
                 <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '10px' }}>
                   <thead>
                     <tr style={{ backgroundColor: '#f8f9fa' }}>

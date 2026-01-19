@@ -2,7 +2,8 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from core.Item import Item
 from core.grammar import Grammar, NonTerminal, Terminal, Production
-from core.lalr_utils import closure, build_LALR_states, build_parsing_tables, parse_input, tokenize
+from core.clr_utils import closure, build_CLR_states, build_parsing_tables, parse_input, tokenize
+from core.lalr_utils import build_LALR_states
 import io
 import sys
 
@@ -10,8 +11,8 @@ app = Flask(__name__)
 CORS(app)  # Enable CORS for React frontend
 
 current_grammar = None
-current_lr1_states = None
-current_lr1_transitions = None
+current_clr_states = None
+current_clr_transitions = None
 current_lalr_states = None
 current_lalr_transitions = None
 current_ACTION = None
@@ -85,28 +86,28 @@ def build_grammar():
 
         current_grammar = grammar
 
-        # Build LALR
-        lr1_states, lr1_transitions, lalr_states, lalr_transitions, merge_info = build_LALR_states(grammar)
-        lr1_ACTION, lr1_GOTO = build_parsing_tables(lr1_states, lr1_transitions, grammar)
-        lalr_ACTION, lalr_GOTO = build_parsing_tables(lalr_states, lalr_transitions, grammar)
+        # Build CLR
+        clr_states, clr_transitions = build_CLR_states(grammar)
+        clr_ACTION, clr_GOTO = build_parsing_tables(clr_states, clr_transitions, grammar)
 
-        current_lr1_states = lr1_states
-        current_lr1_transitions = lr1_transitions
+        # Build LALR
+        lalr_states, lalr_transitions = build_LALR_states(grammar)
+
+        current_clr_states = clr_states
+        current_clr_transitions = clr_transitions
         current_lalr_states = lalr_states
         current_lalr_transitions = lalr_transitions
-        current_ACTION = lalr_ACTION
-        current_GOTO = lalr_GOTO
+        current_ACTION = clr_ACTION
+        current_GOTO = clr_GOTO
 
         return jsonify({
             'grammar': serialize_grammar(grammar),
             'first_sets': serialize_first_sets(grammar),
-            'lr1_states': serialize_states(lr1_states),
-            'lr1_transitions': serialize_transitions(lr1_transitions),
-            'lr1_tables': serialize_tables(lr1_ACTION, lr1_GOTO),
+            'clr_states': serialize_states(clr_states),
+            'clr_transitions': serialize_transitions(clr_transitions),
             'lalr_states': serialize_states(lalr_states),
             'lalr_transitions': serialize_transitions(lalr_transitions),
-            'lalr_tables': serialize_tables(lalr_ACTION, lalr_GOTO),
-            'merge_info': merge_info
+            'clr_tables': serialize_tables(clr_ACTION, clr_GOTO)
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 400

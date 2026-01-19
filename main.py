@@ -2,7 +2,7 @@
 
 from core.Item import Item
 from core.grammar import Grammar, NonTerminal, Terminal, Production
-from core.lalr_utils import closure, build_LALR_states, build_parsing_tables, parse_input, tokenize
+from core.clr_utils import closure, build_CLR_states, build_parsing_tables, parse_input, tokenize
 
 def build_local_example_grammar():
     E = NonTerminal('E')
