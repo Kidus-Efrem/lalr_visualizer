@@ -106,6 +106,7 @@ def merge_LALR_states(lr1_states, lr1_transitions):
 
     lalr_states = []
     state_map = {}  # LR(1) state → LALR state id
+    merge_info = []  # Information about merges
 
     for new_id, (_, state_indices) in enumerate(core_map.items()):
         merged_items = {}
@@ -127,6 +128,14 @@ def merge_LALR_states(lr1_states, lr1_transitions):
         for old_id in state_indices:
             state_map[old_id] = new_id
 
+        # Record merge information
+        if len(state_indices) > 1:
+            merge_info.append({
+                'lalr_state': new_id,
+                'merged_lr1_states': state_indices,
+                'core_items': [(str(prod), dot) for prod, dot in merged_items.keys()]
+            })
+
     # Remap transitions
     lalr_transitions = {}
     for (old_state, sym), old_target in lr1_transitions.items():
@@ -134,7 +143,7 @@ def merge_LALR_states(lr1_states, lr1_transitions):
         t = state_map[old_target]
         lalr_transitions[(s, sym)] = t
 
-    return lalr_states, lalr_transitions
+    return lalr_states, lalr_transitions, merge_info
 
 
 # --------------------------------------------------
@@ -145,10 +154,10 @@ def build_LALR_states(grammar):
     lr1_states, lr1_transitions = build_LR1_states(grammar)
     print("\n[INFO] Built canonical LR(1) states:", len(lr1_states))
 
-    lalr_states, lalr_transitions = merge_LALR_states(lr1_states, lr1_transitions)
+    lalr_states, lalr_transitions, merge_info = merge_LALR_states(lr1_states, lr1_transitions)
     print("[INFO] After LALR merging:", len(lalr_states))
 
-    return lalr_states, lalr_transitions
+    return lr1_states, lr1_transitions, lalr_states, lalr_transitions, merge_info
 
 
 # --------------------------------------------------
@@ -182,12 +191,13 @@ def build_parsing_tables(states, transitions, grammar):
 # --------------------------------------------------
 
 def parse_input(tokens, ACTION, GOTO, grammar):
-    stack = [0]
+    state_stack = [0]
+    symbol_stack = []  # Track symbols for clarity
     i = 0
 
     print("\nParsing steps:")
     while True:
-        state = stack[-1]
+        state = state_stack[-1]
         token = tokens[i]
 
         action = ACTION.get((state, token))
@@ -195,9 +205,15 @@ def parse_input(tokens, ACTION, GOTO, grammar):
             print(f"❌ Error at state {state}, token {token}")
             return False
 
+        # Print current state with symbols
+        remaining_input = ' '.join(str(t) for t in tokens[i:])
+        symbols_display = ' '.join(symbol_stack) if symbol_stack else 'ε'
+        print(f"Stack: {symbols_display} | Input: {remaining_input} | Action: ", end="")
+
         if action.startswith("S"):
             ns = int(action[2:-1])
-            stack.append(ns)
+            state_stack.append(ns)
+            symbol_stack.append(str(token))
             i += 1
             print(f"Shift {token}, push {ns}")
 
@@ -206,12 +222,17 @@ def parse_input(tokens, ACTION, GOTO, grammar):
             lhs, rhs = prod.split("→")
             rhs_len = len(rhs.strip().split()) if rhs.strip() else 0
 
+            # Pop symbols and states
             for _ in range(rhs_len):
-                stack.pop()
+                if symbol_stack:
+                    symbol_stack.pop()
+                state_stack.pop()
 
-            top = stack[-1]
+            # Push the reduced non-terminal
+            symbol_stack.append(lhs.strip())
+            top = state_stack[-1]
             goto = GOTO.get((top, NonTerminal(lhs.strip())))
-            stack.append(goto)
+            state_stack.append(goto)
             print(f"Reduce {prod}, goto {goto}")
 
         elif action == "ACC":
